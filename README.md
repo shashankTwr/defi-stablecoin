@@ -7,3 +7,8 @@
    1. wETH
    2. wBTC
 
+
+## Process
+
+1. Imported ERC20Burnable for its burn functions
+2. Imported Ownable so we can perform owner only functions

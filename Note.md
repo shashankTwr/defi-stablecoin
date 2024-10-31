@@ -3,6 +3,7 @@
 23:02:06 Code Walkthrough
 23:05:11 What is a Stablecoin?(But actually)
 23:33:29 DecentralizedStableCoin.sol
+23:47:31 DSCEngine.sol Setup
 
 
 ## DefiLlama
