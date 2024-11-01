@@ -4,6 +4,7 @@
 23:05:11 What is a Stablecoin?(But actually)
 23:33:29 DecentralizedStableCoin.sol
 23:47:31 DSCEngine.sol Setup
+23:57:37 Deposit collateral
 
 
 ## DefiLlama
