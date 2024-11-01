@@ -20,8 +20,9 @@
 // 			private
 //          view & pure
 
-
 pragma solidity ^0.8.19;
+
+import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 
 /// @title DSCEngine
 /// @author Shashank Tiwari
@@ -37,28 +38,51 @@ pragma solidity ^0.8.19;
 /// @dev Explain to a developer any extra details
 
 contract DSCEngine {
-
     /*//////////////////////////////////////////////////////////////
     //                             ERRORS
     //////////////////////////////////////////////////////////////*/
     error DSCEngine__MustBeMoreThanZero();
+    error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+
+    /*//////////////////////////////////////////////////////////////
+    //                        STATE VARIABLES                     //
+    //////////////////////////////////////////////////////////////*/
+    mapping(address token => address priceFeed) private s_priceFeeds;
+
+    DecentralizedStableCoin private i_dsc;
 
     /*//////////////////////////////////////////////////////////////
     //                           MODIFIERS                        //
     //////////////////////////////////////////////////////////////*/
     modifier moreThanZero(uint256 amount) {
-        if(amount == 0){
+        if (amount == 0) {
             revert DSCEngine__MustBeMoreThanZero();
         }
         _;
     }
 
+    modifier isAllowedToken(address token) {}
 
     /*//////////////////////////////////////////////////////////////
     //                           FUNCTIONS                        //
     //////////////////////////////////////////////////////////////*/
 
-    constructor() {}
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddress, address dscAddress) {
+        if (tokenAddresses.length != priceFeedAddress.length) {
+            revert DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+        }
+
+        // For example ETH/USD, BTC/USD, MKR/USD
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            s_priceFeeds[tokenAddresses[i]] = priceFeedAddress[i];
+        }
+
+        i_dsc = DecentralizedStableCoin(dscAddress);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+    //                  EXTERNAL Functions                        //
+    //////////////////////////////////////////////////////////////*/
 
     function depositCOllateralAndMintDSC() external {}
 
@@ -66,9 +90,10 @@ contract DSCEngine {
      * @param tokenCollateralAddress The address of the token to deposit as collateral
      * @param amountCollateral The amount of collateral to deposit
      */
-    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) {
-
-    }
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        external
+        moreThanZero(amountCollateral)
+    {}
 
     function redeemCollateralForDSC() external {}
 
@@ -81,5 +106,4 @@ contract DSCEngine {
     function liquidate() external {}
 
     function getHealthFactor() external view {}
-
 }
