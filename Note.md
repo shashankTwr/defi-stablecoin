@@ -5,7 +5,9 @@
 23:33:29 DecentralizedStableCoin.sol
 23:47:31 DSCEngine.sol Setup
 23:57:37 Deposit collateral
-
+24:15:38 Mint DSC: Getting the value of our collateral
+24:32:02 Mint DSC: Health Factor
+24:38:54 Mint DSC: Minting the DSC
 
 ## DefiLlama
 
