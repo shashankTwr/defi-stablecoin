@@ -8,6 +8,8 @@
 24:15:38 Mint DSC: Getting the value of our collateral
 24:32:02 Mint DSC: Health Factor
 24:38:54 Mint DSC: Minting the DSC
+24:40:16 Testing while developing: Deploy Script
+24:55:12 Testing while developing: Testing
 
 ## DefiLlama
 

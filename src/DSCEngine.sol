@@ -23,7 +23,7 @@
 pragma solidity ^0.8.19;
 
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
@@ -36,7 +36,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/Ag
 /// - Algorithmically Stable
 /// - It is similar to DAI if DAI had no governance, no fees and was only backed by WETH and WBTC
 /// - Our system should always be *overcollateralized* At no point, should the value of all collateral be less than the value of DSC.
-/// @notice This contract is the core of the DSC system. It handles all the logic for mining and redeeming DSC, as well as depositing  & withdrawing collateral
+/// @notice This contract is the core of the DSC system. It handles allorge install openzeppelin/openzeppelin-contracts@v4.8.3 --no-commit the logic for mining and redeeming DSC, as well as depositing  & withdrawing collateral
 /// @notice This contract is very loosely based on the MakerDAO DSS (DAI) system
 /// @dev Explain to a developer any extra details
 
