@@ -71,6 +71,7 @@ contract DSCEngine is ReentrancyGuard {
     //                        EVENTS                              //
     //////////////////////////////////////////////////////////////*/
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address indexed user, address indexed token,uint256 indexed amount);
 
     /*//////////////////////////////////////////////////////////////
     //                           MODIFIERS                        //
@@ -141,9 +142,38 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralForDSC() external {}
+    /**
+     * @param tokenCollateralAddress Collateral address to redeem
+     * @param amountCollateral  Amount of collateral to redeem 
+     * @param amountDscToBurn  amount of DSC to burn
+     * @notice This function burns DSC and redeems underlying collateral in one transaction
+     */
+    function redeemCollateralForDSC(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn) external {
+        burnDSC(amountDscToBurn);
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+        // redeem Collateral already checks factor
+    }
 
-    function redeemCollateral() external {}
+
+    // in order to redeem collateral
+    // 1. Health factor must be over 1 after collateral pulled
+    // DRY concept: Don't repeat yourself
+
+    // CEI: Check, effects, interactions
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public moreThanZero(amountCollateral)  nonReentrant {
+        // revert if they are trying to pull more collateral
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+
+        emit CollateralRedeemed(msg.sender, tokenCollateralAddress, amountCollateral);
+
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+
+        _revertIfHealthFactorIsBroken(msg.sender);
+
+    }
 
     /**
      * @notice follows CEI
@@ -160,7 +190,17 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function burnDSC() external {}
+    // Do we need to check if this breaks health factor?
+    function burnDSC(uint256 amount) public moreThanZero(amount){
+        s_DSCMinted[msg.sender] -= amount;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+
+        i_dsc.burn(amount);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     function liquidate() external {}
 
