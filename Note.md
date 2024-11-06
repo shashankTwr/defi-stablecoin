@@ -10,6 +10,8 @@
 24:38:54 Mint DSC: Minting the DSC
 24:40:16 Testing while developing: Deploy Script
 24:55:12 Testing while developing: Testing
+25:06:33 DSCEngine: depositCollateralAndMintDSC
+25:09:01 DSCEngine: redeemCollateral
 
 ## DefiLlama
 

@@ -25,9 +25,9 @@ contract HelperConfig is Script{
 
     constructor () {
         if(block.chainid == 11155111){
-            activeNetworkConfig = getSepoliaEthConfig;
+            activeNetworkConfig = getSepoliaEthConfig();
         }else {
-            activeNetworkConfig = getOrCreateAnvilEthConfig;
+            activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
     }
 
@@ -64,10 +64,10 @@ contract HelperConfig is Script{
         vm.stopBroadcast();
 
         return NetworkConfig({
-            wethUsdPriceFeed: ethUsdPriceFeed.address,
-            wbtcUsdPriceFeed: btcUsdPriceFeed.address,
-            weth: wethMock.address,
-            wbtc: wbtcMock.address,
+            wethUsdPriceFeed: address(ethUsdPriceFeed),
+            wbtcUsdPriceFeed: address(btcUsdPriceFeed),
+            weth: address(wethMock),
+            wbtc: address(wbtcMock),
             deployerKey: DEFAULT_ANVIL_KEY
         });
     }
