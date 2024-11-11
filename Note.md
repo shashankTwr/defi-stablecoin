@@ -14,6 +14,15 @@
 25:09:01 DSCEngine: redeemCollateral
 25:20:38 DSCEngine: Liquidate Setup
 25:37:34 DSCEngine: Liquidate Refactoring
+25:47:02 Sanity Check & Tests
+26:04:34 Write some tests and Check for a glaring bug
+26:06:28 Challenge: Get DSCEngine.sol test coverage above 85%
+26:06:41 Level up your testing skills
+   26:07:48 - Constructor tests repeated
+   26:09:31 - PriceFeed Tests
+   26:11:05 - Deposit Collateral tests
+   26:23: I think there's a repeat
+26:23:39  
 
 ## DefiLlama
 
