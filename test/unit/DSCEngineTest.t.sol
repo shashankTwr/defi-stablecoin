@@ -119,11 +119,11 @@ contract DSCEngineTest is Test {
 
     // does not break if too high of a health factor
     // function testMintDSCRevertsIfHealthFactorBroken() public  {
-        
+
     //     vm.startPrank(USER);
     //     ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
     //     dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
- 
+
     //     // Set up scenario where health factor will break
     //     uint256 unsafeMintAmount = STARTING_ERC20_BALANCE * 1000; // Hypothetically high amount to break health factor
 
@@ -131,7 +131,7 @@ contract DSCEngineTest is Test {
     //     console.log(expectedHealthFactor);
     //     vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCENGINE__BreaksHealthFactor.selector, expectedHealthFactor));
     //     dscEngine.mintDSC(unsafeMintAmount);
-    //     // Act       
+    //     // Act
     //     vm.stopPrank();
     // }
 
