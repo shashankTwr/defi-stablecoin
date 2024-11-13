@@ -21,8 +21,8 @@
    26:07:48 - Constructor tests repeated
    26:09:31 - PriceFeed Tests
    26:11:05 - Deposit Collateral tests
-   26:23: I think there's a repeat
-26:23:39  
+26:27:29 Fuzz(Invariant) Testing video
+26:37:01 Open-Based Fuzz(Invariant) Tests
 
 ## DefiLlama
 
@@ -88,3 +88,12 @@
 1. Important understanding of curve finance and defi marketplace and stablecoin
 2. AAVE and Curve stablecoin
 
+## Fuzzing test
+
+1. Stateless Fuzzing v/s Stateful fuzzing
+2. Foundry fuzzing v/s Foundry invariant
+
+## Invariant
+
+1. Understand what invariants
+2. Advance fuzzing -> trail of bits
