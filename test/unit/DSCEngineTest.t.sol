@@ -29,12 +29,18 @@ contract DSCEngineTest is Test {
     uint256 deployerKey;
 
     address public USER = makeAddr("user");
+    address public DEBTOR = makeAddr("DEBTOR");
     address public LIQUIDATOR = makeAddr("liquidator");
-    uint256 public constant AMOUNT_COLLATERAL = 10 ether;
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
-    uint256 public constant MINT_AMOUNT = 1 ether;
-    uint256 public LIQUIDATOR_DSC_BALANCE = 10 ether;
+    uint256 public constant DEBTOR_STARTING_ERC20_BALANCE = 10 ether;
+    uint256 public constant LIQUIDATOR_STARTING_ERC20_BALANCE = 100 ether;
+    uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant DEBTOR_AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant LIQUIDATOR_AMOUNT_COLLATERAL = 50 ether;
 
+    uint256 public constant MINT_AMOUNT = 1 ether;
+    uint256 public constant DEBTOR_MINT_AMOUNT = 1 ether;
+    uint256 public constant LIQUIDATOR_MINT_AMOUNT = 5 ether;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     function setUp() public {
@@ -92,6 +98,38 @@ contract DSCEngineTest is Test {
         dscEngine.mintDSC(MINT_AMOUNT);
         vm.stopPrank();
         _;
+    }
+
+    /* function burnDSC(uint256 amount) public moreThanZero(amount) {
+        _burnDSC(msg.sender, msg.sender, amount);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    } */
+    /* 
+    function _burnDSC(address onBehalfOf, address dscFrom, uint256 amountDscToBurn) private {
+
+        s_DSCMinted[onBehalfOf] -= amountDscToBurn;
+        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+
+        i_dsc.burn(amountDscToBurn);
+    } */
+
+    function testBurnDSCRevertsIfAmountToBeBurnedIsZero() public depositedAndMinted {
+        // Expect revert due to zero amount
+        vm.expectRevert(DSCEngine__MustBeMoreThanZero.selector);
+        // Act
+        vm.prank(USER);
+        dscEngine.burnDSC(0);
+    }
+
+    function testIBurnDscRevertsIfAmountDscToBurnIsGreaterThanDSCMintedByParticipant() public depositedAndMinted {
+        // Expect revert due to zero amount
+        vm.expectRevert("error");
+        // Act
+        vm.prank(USER);
+        dscEngine.burnDSC(MINT_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -208,13 +246,19 @@ contract DSCEngineTest is Test {
     //                       REDEEM COLLATERAL                   //
     //////////////////////////////////////////////////////////////*/
 
-    function testRedeemCollateralForDSCSucceeds() public depositedCollateral {
-        uint256 amountDscToBurn = 1 ether; // Assume this amount keeps the health factor safe
-        uint256 amountCollateralToRedeem = 0.5 ether; // Choose a safe amount of collateral
+    // 10 ether Starting ERC balance 10 ether collateral 1 ether Minted DSC
+    modifier redeemCollateral() {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+        dscEngine.mintDSC(MINT_AMOUNT * 2);
+        vm.stopPrank();
+        _;
+    }
 
-        // Mint some DSC to USER so they can burn it
-        vm.prank(USER);
-        dscEngine.mintDSC(amountDscToBurn);
+    function testRedeemCollateralForDSCSucceeds() public redeemCollateral {
+        uint256 amountDscToBurn = 0.25 ether; // Assume this amount keeps the health factor safe
+        uint256 amountCollateralToRedeem = 0.5 ether; // Choose a safe amount of collateral
 
         // USER burns DSC and redeems collateral
         vm.prank(USER);
@@ -266,36 +310,60 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     modifier liquidatorSetup() {
+        // Set up the account
+        // Account Starting_ERC20_balance Collateral DSC_MINTED
+        // DEBTOR  10  10 1
+        // LIQUDATOR 100 50 5
+
+        ERC20Mock(weth).mint(DEBTOR, DEBTOR_STARTING_ERC20_BALANCE);
+        ERC20Mock(weth).mint(LIQUIDATOR, LIQUIDATOR_STARTING_ERC20_BALANCE);
+
+        vm.startPrank(DEBTOR);
+        ERC20Mock(weth).approve(address(dscEngine), DEBTOR_AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, DEBTOR_AMOUNT_COLLATERAL);
+        dscEngine.mintDSC(DEBTOR_MINT_AMOUNT);
+        vm.stopPrank();
+        console.log(dscEngine.getHealthFactor(DEBTOR));
+
         vm.startPrank(LIQUIDATOR);
-        // Mint DSC to the liquidator so they have enough balance to cover debt for liquidation.
-        dsc.mint(LIQUIDATOR, LIQUIDATOR_DSC_BALANCE);
+        ERC20Mock(weth).approve(address(dscEngine), LIQUIDATOR_AMOUNT_COLLATERAL);
+        dscEngine.depositCollateral(weth, LIQUIDATOR_AMOUNT_COLLATERAL);
+        dscEngine.mintDSC(LIQUIDATOR_MINT_AMOUNT);
         vm.stopPrank();
         _;
     }
 
-    function testLiquidateSucceedsAndImprovesHealthFactor() public depositedAndMinted liquidatorSetup {
-        uint256 debtToCover = 50 ether; // Amount of DSC to burn
+    function testLiquidateSucceedsAndImprovesHealthFactor() public liquidatorSetup {
+        vm.prank(DEBTOR);
+        dscEngine.mintDSC(DEBTOR_MINT_AMOUNT * 5);
+        console.log(dscEngine.getHealthFactor(DEBTOR));
+
+        // 10000000000000000000000
+        // 1666666666666666666666666
+
+        // Set up the liquidation
+        uint256 debtToCover = 6 ether; // Amount of DSC to burn
         address collateral = weth; // Collateral token address
         uint256 bonusCollateralAmount = dscEngine.getLiquidationBonus(collateral, debtToCover);
 
         // Ensure the `user` has a low health factor by manipulating prices or borrowing too much.
         // Assume this setup is done here, and the user's health factor is already below MIN_HEALTH_FACTOR.
 
-        uint256 startingUserHealthFactor = dscEngine.getHealthFactor(USER);
+        uint256 startingUserHealthFactor = dscEngine.getHealthFactor(DEBTOR);
 
         // Liquidator burns `debtToCover` DSC in exchange for `totalCollateralToRedeem`
         vm.prank(LIQUIDATOR); // LIQUIDATOR acts as the caller
-        dscEngine.liquidate(collateral, USER, debtToCover);
+        dscEngine.liquidate(collateral, DEBTOR, debtToCover);
 
         // Check the user's collateral balance to ensure some was redeemed
-        uint256 userRemainingCollateral = dscEngine.getCollateralBalance(collateral, USER);
+        uint256 userRemainingCollateral = dscEngine.getCollateralBalance(collateral, DEBTOR);
         uint256 liquidatorCollateralBalance = dscEngine.getCollateralBalance(collateral, LIQUIDATOR);
 
         // Assert collateral transfer with bonus
         assertEq(liquidatorCollateralBalance, bonusCollateralAmount);
 
         // Check health factor of `user` to confirm improvement
-        uint256 endingUserHealthFactor = dscEngine.getHealthFactor(USER);
+        uint256 endingUserHealthFactor = dscEngine.getHealthFactor(DEBTOR);
         assertTrue(endingUserHealthFactor > startingUserHealthFactor);
         assertTrue(endingUserHealthFactor >= dscEngine.getMinimumHealthFactor());
     }
