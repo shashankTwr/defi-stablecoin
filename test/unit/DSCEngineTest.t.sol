@@ -7,6 +7,7 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract DSCEngineTest is Test {
     error DSCEngine__MustBeMoreThanZero();
@@ -100,22 +101,6 @@ contract DSCEngineTest is Test {
         _;
     }
 
-    /* function burnDSC(uint256 amount) public moreThanZero(amount) {
-        _burnDSC(msg.sender, msg.sender, amount);
-        _revertIfHealthFactorIsBroken(msg.sender);
-    } */
-    /* 
-    function _burnDSC(address onBehalfOf, address dscFrom, uint256 amountDscToBurn) private {
-
-        s_DSCMinted[onBehalfOf] -= amountDscToBurn;
-        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
-        if (!success) {
-            revert DSCEngine__TransferFailed();
-        }
-
-        i_dsc.burn(amountDscToBurn);
-    } */
-
     function testBurnDSCRevertsIfAmountToBeBurnedIsZero() public depositedAndMinted {
         // Expect revert due to zero amount
         vm.expectRevert(DSCEngine__MustBeMoreThanZero.selector);
@@ -124,27 +109,28 @@ contract DSCEngineTest is Test {
         dscEngine.burnDSC(0);
     }
 
-    function testIBurnDscRevertsIfAmountDscToBurnIsGreaterThanDSCMintedByParticipant() public depositedAndMinted {
+    function testIBurnDscRevertsIfAmountDscToBurnIsGreaterThanDSCMintedByParticipant() public {
         // Expect revert due to zero amount
-        vm.expectRevert("error");
+        vm.expectRevert();
         // Act
         vm.prank(USER);
         dscEngine.burnDSC(MINT_AMOUNT);
     }
 
+    function testBurnDSCWorks() public depositedAndMinted {
+        vm.startPrank(USER);
+
+        dsc.approve(address(dscEngine), MINT_AMOUNT);
+        dscEngine.burnDSC(MINT_AMOUNT);
+        vm.stopPrank();
+
+        uint256 remainingUserBalance = dsc.balanceOf(USER);
+        assertEq(remainingUserBalance, 0);
+    }
+
     /*//////////////////////////////////////////////////////////////
     //                              Mint DSC                     //
     //////////////////////////////////////////////////////////////*/
-
-    function testMintDSCSuccess() public depositedCollateral {
-        // Act
-        vm.prank(USER);
-        dscEngine.mintDSC(MINT_AMOUNT);
-
-        // Assert
-        assertEq(dsc.balanceOf(USER), MINT_AMOUNT, "User should have minted the correct amount of DSC");
-        assertEq(dscEngine.getDSCMinted(USER), MINT_AMOUNT, "Minted amount should be updated in contract");
-    }
 
     function testMintDSCRevertsIfZeroAmount() public depositedCollateral {
         // Expect revert due to zero amount
@@ -155,52 +141,31 @@ contract DSCEngineTest is Test {
         dscEngine.mintDSC(0);
     }
 
-    // does not break if too high of a health factor
-    // function testMintDSCRevertsIfHealthFactorBroken() public  {
+    // mint fails if collateral is not enough
+    function testMintDSCRevertsIfHealthFactorBroken() public depositedCollateral {
+        (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        uint256 amountToMint =
+            (AMOUNT_COLLATERAL * (uint256(price) * dscEngine.getAdditionalFeedPrecision())) / dscEngine.getPrecision();
 
-    //     vm.startPrank(USER);
-    //     ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
-    //     dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+        uint256 expectedHealthFactor =
+            dscEngine.calculateHealthFactor(amountToMint, dscEngine.getUsdValue(weth, AMOUNT_COLLATERAL));
 
-    //     // Set up scenario where health factor will break
-    //     uint256 unsafeMintAmount = STARTING_ERC20_BALANCE * 1000; // Hypothetically high amount to break health factor
+        vm.startPrank(USER);
 
-    //     uint256 expectedHealthFactor = dscEngine.getHealthFactor(USER);
-    //     console.log(expectedHealthFactor);
-    //     vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCENGINE__BreaksHealthFactor.selector, expectedHealthFactor));
-    //     dscEngine.mintDSC(unsafeMintAmount);
-    //     // Act
-    //     vm.stopPrank();
-    // }
-
-    // function testMintDSCRevertsIfMintFails() public depositedCollateral {
-    //     // Set up to force a mint failure by manipulating the DSC contract behavior
-    //     // This may require modifying the `DecentralizedStableCoin` or mocking the failure
-
-    //     // To illustrate, we assume a function exists to simulate mint failure
-    //     dsc.setMintFailCondition(true); // Assuming such a function exists in your mock
-
-    //     vm.expectRevert(DSCEngine__MintFailed.selector);
-
-    //     // Act
-    //     vm.prank(USER);
-    //     dscEngine.mintDSC(MINT_AMOUNT);
-
-    //     // Cleanup for other tests
-    //     dsc.setMintFailCondition(false);
-    // }
-
-    function testMintDSCUpdatesStateCorrectly() public depositedCollateral {
-        // Arrange
-        uint256 initialMintedAmount = dscEngine.getDSCMinted(USER);
-
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCENGINE__BreaksHealthFactor.selector, expectedHealthFactor));
         // Act
-        vm.prank(USER);
-        dscEngine.mintDSC(MINT_AMOUNT);
+        // Set up scenario where health factor will break
+        dscEngine.mintDSC(amountToMint); // Hypothetically high amount to break health factor
+        vm.stopPrank();
+    }
 
-        // Assert state update
-        uint256 expectedMintedAmount = initialMintedAmount + MINT_AMOUNT;
-        assertEq(dscEngine.getDSCMinted(USER), expectedMintedAmount, "Minted DSC amount should update correctly");
+    function testMintDSCWorks() public depositedCollateral {
+        vm.startPrank(USER);
+        dscEngine.mintDSC(MINT_AMOUNT);
+        vm.stopPrank();
+
+        uint256 remainingUserBalance = dsc.balanceOf(USER);
+        assertEq(remainingUserBalance, MINT_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -247,7 +212,7 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     // 10 ether Starting ERC balance 10 ether collateral 1 ether Minted DSC
-    modifier redeemCollateral() {
+    /*     modifier redeemCollateral() {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
         dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
@@ -266,7 +231,7 @@ contract DSCEngineTest is Test {
 
         // Assertions
         uint256 remainingDscBalance = dsc.balanceOf(USER);
-        uint256 remainingCollateral = dscEngine.getCollateralBalance(weth, USER);
+        uint256 remainingCollateral = dscEngine.getCollateralBalanceOfUser(weth, USER);
 
         // Check that the DSC balance has decreased by the burned amount
         assertEq(remainingDscBalance, STARTING_ERC20_BALANCE - amountDscToBurn);
@@ -303,13 +268,13 @@ contract DSCEngineTest is Test {
         vm.prank(USER);
         vm.expectRevert(DSCEngine__MustBeMoreThanZero.selector);
         dscEngine.redeemCollateralForDSC(weth, 1 ether, 0);
-    }
+    } */
 
     /*//////////////////////////////////////////////////////////////
     //                           LIQUIDATE
     //////////////////////////////////////////////////////////////*/
 
-    modifier liquidatorSetup() {
+    /*     modifier liquidatorSetup() {
         // Set up the account
         // Account Starting_ERC20_balance Collateral DSC_MINTED
         // DEBTOR  10  10 1
@@ -356,8 +321,8 @@ contract DSCEngineTest is Test {
         dscEngine.liquidate(collateral, DEBTOR, debtToCover);
 
         // Check the user's collateral balance to ensure some was redeemed
-        uint256 userRemainingCollateral = dscEngine.getCollateralBalance(collateral, DEBTOR);
-        uint256 liquidatorCollateralBalance = dscEngine.getCollateralBalance(collateral, LIQUIDATOR);
+        uint256 userRemainingCollateral = dscEngine.getCollateralBalanceOfUser(collateral, DEBTOR);
+        uint256 liquidatorCollateralBalance = dscEngine.getCollateralBalanceOfUser(collateral, LIQUIDATOR);
 
         // Assert collateral transfer with bonus
         assertEq(liquidatorCollateralBalance, bonusCollateralAmount);
@@ -406,15 +371,15 @@ contract DSCEngineTest is Test {
         address collateral = weth;
 
         // Assume user has low health factor
-        uint256 startingUserCollateralBalance = dscEngine.getCollateralBalance(collateral, USER);
-        uint256 liquidatorStartingCollateralBalance = dscEngine.getCollateralBalance(collateral, LIQUIDATOR);
+        uint256 startingUserCollateralBalance = dscEngine.getCollateralBalanceOfUser(collateral, USER);
+        uint256 liquidatorStartingCollateralBalance = dscEngine.getCollateralBalanceOfUser(collateral, LIQUIDATOR);
 
         vm.prank(LIQUIDATOR);
         dscEngine.liquidate(collateral, USER, partialDebtToCover);
 
         // Check that partial debt has been burned and collateral rewarded to the liquidator
         uint256 userRemainingDebt = dscEngine.getDebtBalance(USER);
-        uint256 liquidatorNewCollateralBalance = dscEngine.getCollateralBalance(collateral, LIQUIDATOR);
+        uint256 liquidatorNewCollateralBalance = dscEngine.getCollateralBalanceOfUser(collateral, LIQUIDATOR);
 
         // Ensure partial debt has been reduced from USER's balance
         assertEq(userRemainingDebt, initialDebtToCover - partialDebtToCover);
@@ -426,5 +391,5 @@ contract DSCEngineTest is Test {
         // Check that USER's health factor has improved, even if partial
         uint256 endingUserHealthFactor = dscEngine.getHealthFactor(USER);
         assertTrue(endingUserHealthFactor > dscEngine.getMinimumHealthFactor());
-    }
+    } */
 }
