@@ -212,11 +212,11 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     // 10 ether Starting ERC balance 10 ether collateral 1 ether Minted DSC
-    /*     modifier redeemCollateral() {
+    modifier redeemCollateral() {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
         dscEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
-        dscEngine.mintDSC(MINT_AMOUNT * 2);
+        dscEngine.mintDSC(MINT_AMOUNT);
         vm.stopPrank();
         _;
     }
@@ -226,78 +226,175 @@ contract DSCEngineTest is Test {
         uint256 amountCollateralToRedeem = 0.5 ether; // Choose a safe amount of collateral
 
         // USER burns DSC and redeems collateral
-        vm.prank(USER);
+        vm.startPrank(USER);
+        dsc.approve(address(dscEngine), amountDscToBurn);
+        ERC20Mock(weth).approve(address(dscEngine), amountCollateralToRedeem);
         dscEngine.redeemCollateralForDSC(weth, amountCollateralToRedeem, amountDscToBurn);
-
         // Assertions
         uint256 remainingDscBalance = dsc.balanceOf(USER);
         uint256 remainingCollateral = dscEngine.getCollateralBalanceOfUser(weth, USER);
-
         // Check that the DSC balance has decreased by the burned amount
-        assertEq(remainingDscBalance, STARTING_ERC20_BALANCE - amountDscToBurn);
-
+        assertEq(remainingDscBalance, MINT_AMOUNT - amountDscToBurn, "DSC balance has decreased");
         // Check that the collateral balance has decreased by the redeemed amount
-        assertEq(remainingCollateral, AMOUNT_COLLATERAL - amountCollateralToRedeem);
-
+        assertEq(
+            remainingCollateral,
+            AMOUNT_COLLATERAL - amountCollateralToRedeem,
+            "collateral balance has decreased appropriately"
+        );
         // Ensure that the user's health factor is above the minimum
         uint256 userHealthFactor = dscEngine.getHealthFactor(USER);
         assertTrue(userHealthFactor >= dscEngine.getMinimumHealthFactor());
     }
 
-    function testRedeemCollateralForDSCRevertsIfHealthFactorBroken() public depositedCollateral {
-        uint256 amountDscToBurn = 1 ether;
-        uint256 amountCollateralToRedeem = 10 ether; // This large amount should trigger a health factor issue
+    function testRedeemCollateralForDSCRevertsIfHealthFactorBroken() public redeemCollateral {
+        uint256 amountDscToBurn = 0.25 ether; // initially minted 1 ether  -> burnt 0.25 ether -> (1 - 0.25) remaining DSC Minted
+        uint256 amountCollateralToRedeem = 9.5 ether; // 0.5 ether -> 0.5 *  1000 -> 500 mint??
+
+        //  7.5e17
 
         // Mint some DSC to USER so they can burn it
-        vm.prank(USER);
-        dscEngine.mintDSC(amountDscToBurn);
+        vm.startPrank(USER);
+        dsc.approve(address(dscEngine), amountDscToBurn);
+        ERC20Mock(weth).approve(address(dscEngine), amountCollateralToRedeem);
 
+        (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        uint256 amountToMint = (
+            (AMOUNT_COLLATERAL - amountCollateralToRedeem) * (uint256(price) * dscEngine.getAdditionalFeedPrecision())
+        ) / dscEngine.getPrecision();
+        dscEngine.mintDSC(amountToMint);
+
+       
+        uint256 expectedHealthFactor = dscEngine.calculateHealthFactor(
+            amountToMint + MINT_AMOUNT - amountDscToBurn, dscEngine.getUsdValue(weth, (AMOUNT_COLLATERAL - amountCollateralToRedeem))
+        );
+
+        // implement code to get AMOUNT_COLLATERAL - amountCollateralToRedeem and accurate health factor by utilizing latest round data
+        // (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        // uint256 amountToMint =
+        //     (AMOUNT_COLLATERAL * (uint256(price) * dscEngine.getAdditionalFeedPrecision())) / dscEngine.getPrecision();
+
+        // uint256 expectedHealthFactor =
+        //     dscEngine.calculateHealthFactor(amountToMint, dscEngine.getUsdValue(weth, AMOUNT_COLLATERAL));
         // Attempt to redeem more collateral than the health factor allows
-        vm.prank(USER);
-        vm.expectRevert(DSCENGINE__BreaksHealthFactor.selector);
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCENGINE__BreaksHealthFactor.selector, expectedHealthFactor));
         dscEngine.redeemCollateralForDSC(weth, amountCollateralToRedeem, amountDscToBurn);
     }
 
-    function testRedeemCollateralForDSCRevertsWithZeroAmounts() public {
-        // Attempt to redeem with zero collateral amount
-        vm.prank(USER);
-        vm.expectRevert(DSCEngine__MustBeMoreThanZero.selector);
-        dscEngine.redeemCollateralForDSC(weth, 0, 1 ether);
+    // redeemCollateral -> redeems collateral without burning DSC
 
-        // Attempt to redeem with zero DSC burn amount
-        vm.prank(USER);
+    // morethanzero modifier works
+    function testRedeemCollateralRevertsIfReedeemAmountIsZero() public redeemCollateral {
+        // Arrange
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), AMOUNT_COLLATERAL);
+        // Act and Assert
         vm.expectRevert(DSCEngine__MustBeMoreThanZero.selector);
-        dscEngine.redeemCollateralForDSC(weth, 1 ether, 0);
-    } */
+        dscEngine.redeemCollateral(weth, 0);
+    }
+
+    // allowedToken
+    function testRedeemCollateralRevertsIfTokenIsNotAllowed() public redeemCollateral {
+        // Arrange
+        ERC20Mock hackToken = new ERC20Mock("HackToken", "HT", USER, STARTING_ERC20_BALANCE);
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__NotAllowedToken.selector);
+        dscEngine.redeemCollateral(address(hackToken), AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
+
+    function testRedeemCollateralRevertsIfRedeemAmountIsMoreThanCollateralAtDisposal() public redeemCollateral {
+        uint256 amountCollateralToRedeem = 11 ether; // amount collateral is 10 ether
+        // Arrange
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), amountCollateralToRedeem);
+
+        // Act and Assert
+        vm.expectRevert(DSCEngine.DSCEngine__NotEnoughCollateral.selector);
+        dscEngine.redeemCollateral(weth, amountCollateralToRedeem);
+    }
+
+    function testRedeemCollateralRevertsIfHealthFactorIsNotSafe() public redeemCollateral {
+        uint256 amountCollateralToRedeem = 9.5 ether; // .5 ether -> .5 * $ethUSD collateral
+        // amount collateral is 10 ether 1 is minted we have 200% overcollateralization
+        // to keep health factor safe we have to keep atleast 2 ether collateral, so if we redeem 8.1 ether
+        // we will break health factor
+        // Arrange
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dscEngine), amountCollateralToRedeem);
+
+        (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        console.log("Price: ", price);
+        uint256 amountToMint = (
+            (AMOUNT_COLLATERAL - amountCollateralToRedeem) * (uint256(price) * dscEngine.getAdditionalFeedPrecision())
+        ) / dscEngine.getPrecision();
+        dscEngine.mintDSC(amountToMint);
+
+        
+        uint256 expectedHealthFactor = dscEngine.calculateHealthFactor(
+            amountToMint + MINT_AMOUNT, dscEngine.getUsdValue(weth, (AMOUNT_COLLATERAL - amountCollateralToRedeem))
+        );
+
+        // Act and Assert
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCENGINE__BreaksHealthFactor.selector, expectedHealthFactor));
+        dscEngine.redeemCollateral(weth, amountCollateralToRedeem);
+        // console.log("Expected Health Factor: ", dscEngine.getHealthFactor(USER));
+        vm.stopPrank();
+    }
 
     /*//////////////////////////////////////////////////////////////
     //                           LIQUIDATE
     //////////////////////////////////////////////////////////////*/
 
-    /*     modifier liquidatorSetup() {
-        // Set up the account
-        // Account Starting_ERC20_balance Collateral DSC_MINTED
-        // DEBTOR  10  10 1
-        // LIQUDATOR 100 50 5
 
-        ERC20Mock(weth).mint(DEBTOR, DEBTOR_STARTING_ERC20_BALANCE);
-        ERC20Mock(weth).mint(LIQUIDATOR, LIQUIDATOR_STARTING_ERC20_BALANCE);
+    // modifier idea will be to change the pricefeed data after initializing the debtor so for example
+    // eth -> 1000 usd to eth -> 100 usd then we can liquidate
+    // modifier liquidatorSetup() {
+    //     // Set up the account
+    //     // Account Starting_ERC20_balance Collateral DSC_MINTED
+    //     // DEBTOR  10  10 1
+    //     // LIQUDATOR 100 50 5
+    //     // price 2000 
 
-        vm.startPrank(DEBTOR);
-        ERC20Mock(weth).approve(address(dscEngine), DEBTOR_AMOUNT_COLLATERAL);
-        dscEngine.depositCollateral(weth, DEBTOR_AMOUNT_COLLATERAL);
-        dscEngine.mintDSC(DEBTOR_MINT_AMOUNT);
-        vm.stopPrank();
-        console.log(dscEngine.getHealthFactor(DEBTOR));
+    //     ERC20Mock(weth).mint(DEBTOR, DEBTOR_STARTING_ERC20_BALANCE);
+    //     ERC20Mock(weth).mint(LIQUIDATOR, LIQUIDATOR_STARTING_ERC20_BALANCE);
 
-        vm.startPrank(LIQUIDATOR);
-        ERC20Mock(weth).approve(address(dscEngine), LIQUIDATOR_AMOUNT_COLLATERAL);
-        dscEngine.depositCollateral(weth, LIQUIDATOR_AMOUNT_COLLATERAL);
-        dscEngine.mintDSC(LIQUIDATOR_MINT_AMOUNT);
-        vm.stopPrank();
-        _;
-    }
+    //     (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+    //      uint256 debtorAmountToMint = (
+    //         (DEBTOR_AMOUNT_COLLATERAL /2 ) * (uint256(price) * dscEngine.getAdditionalFeedPrecision())
+    //     ) / dscEngine.getPrecision();
+    //      uint256 liquidatorAmountToMint = (
+    //         (LIQUIDATOR_AMOUNT_COLLATERAL / 2 ) * (uint256(price) * dscEngine.getAdditionalFeedPrecision())
+    //     ) / dscEngine.getPrecision();
 
+    //     vm.startPrank(DEBTOR);
+    //     ERC20Mock(weth).approve(address(dscEngine), DEBTOR_AMOUNT_COLLATERAL);
+    //     dscEngine.depositCollateral(weth, DEBTOR_AMOUNT_COLLATERAL);
+    //     dscEngine.mintDSC(debtorAmountToMint);
+    //     vm.stopPrank();
+    //     console.log(dscEngine.getHealthFactor(DEBTOR));
+
+    //     vm.startPrank(LIQUIDATOR);
+    //     ERC20Mock(weth).approve(address(dscEngine), LIQUIDATOR_AMOUNT_COLLATERAL);
+    //     dscEngine.depositCollateral(weth, LIQUIDATOR_AMOUNT_COLLATERAL);
+    //     dscEngine.mintDSC(liquidatorAmountToMint);
+    //     vm.stopPrank();
+    //     _;
+    // }
+
+    // function testDummyFunc() public liquidatorSetup {
+    //     uint256 amountCollateralToRedeem = 9.5 ether; // .5 ether -> .5 * $ethUSD collateral
+    //     // amount collateral is 10 ether 1 is minted we have 200% overcollateralization
+    //     // to keep health factor safe we have to keep atleast 2 ether collateral, so if we redeem 8.1 ether
+    //     // we will break health factor
+    //     // Arrange
+    //     vm.startPrank(DEBTOR);
+    //     ERC20Mock(weth).approve(address(dscEngine), amountCollateralToRedeem);
+    //     dscEngine.redeemCollateral(weth, amountCollateralToRedeem);
+    //     assertEq(dscEngine.getHealthFactor(DEBTOR), 200);
+
+    // }
+
+/* 
     function testLiquidateSucceedsAndImprovesHealthFactor() public liquidatorSetup {
         vm.prank(DEBTOR);
         dscEngine.mintDSC(DEBTOR_MINT_AMOUNT * 5);
@@ -391,5 +488,5 @@ contract DSCEngineTest is Test {
         // Check that USER's health factor has improved, even if partial
         uint256 endingUserHealthFactor = dscEngine.getHealthFactor(USER);
         assertTrue(endingUserHealthFactor > dscEngine.getMinimumHealthFactor());
-    } */
+    }  */
 }

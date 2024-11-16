@@ -54,11 +54,13 @@ contract DSCEngine is ReentrancyGuard {
     error DSCENGINE__HealthFactorIsOkay();
     error DSCENGINE__HealthFactorNotImproved();
     error DSCEngine__NotEnoughDSCToBurn();
+    error DSCEngine__NotEnoughCollateral();
 
     /*//////////////////////////////////////////////////////////////
     //                        STATE VARIABLES                     //
     //////////////////////////////////////////////////////////////*/
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant FEED_PRECISION = 1e8;
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
     uint256 private constant LIQUIDATION_PRECISION = 100;
@@ -153,13 +155,12 @@ contract DSCEngine is ReentrancyGuard {
 
     // CEI: Check, effects, interactions
     function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        public
+        external
         moreThanZero(amountCollateral)
         nonReentrant
         isAllowedToken(tokenCollateralAddress)
     {
         // revert if they are trying to pull more collateral
-
         _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -293,10 +294,11 @@ contract DSCEngine is ReentrancyGuard {
     function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountCollateral)
         private
     {
+        if (s_collateralDeposited[from][tokenCollateralAddress] < amountCollateral) {
+            revert DSCEngine__NotEnoughCollateral();
+        }
         s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
-
         emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
-
         bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
         if (!success) {
             revert DSCEngine__TransferFailed();
@@ -331,7 +333,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUSD)
         private
-        view
+        pure
         returns (uint256)
     {
         if (totalDscMinted == 0) return type(uint256).max;
@@ -403,7 +405,7 @@ contract DSCEngine is ReentrancyGuard {
         // $2000 /ETH , $1000 = 0.5 ETH
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
-        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
+        return ((usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
     }
 
     function getPrecision() external pure returns (uint256) {
