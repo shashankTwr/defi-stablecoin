@@ -97,3 +97,6 @@
 
 1. Understand what invariants
 2. Advance fuzzing -> trail of bits
+3. Handler based testing is important for invariant testing 
+   1. functions check the order of functions execution
+   2. ![alt text](image.png)
