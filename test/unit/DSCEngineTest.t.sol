@@ -263,9 +263,9 @@ contract DSCEngineTest is Test {
         ) / dscEngine.getPrecision();
         dscEngine.mintDSC(amountToMint);
 
-       
         uint256 expectedHealthFactor = dscEngine.calculateHealthFactor(
-            amountToMint + MINT_AMOUNT - amountDscToBurn, dscEngine.getUsdValue(weth, (AMOUNT_COLLATERAL - amountCollateralToRedeem))
+            amountToMint + MINT_AMOUNT - amountDscToBurn,
+            dscEngine.getUsdValue(weth, (AMOUNT_COLLATERAL - amountCollateralToRedeem))
         );
 
         // implement code to get AMOUNT_COLLATERAL - amountCollateralToRedeem and accurate health factor by utilizing latest round data
@@ -329,7 +329,6 @@ contract DSCEngineTest is Test {
         ) / dscEngine.getPrecision();
         dscEngine.mintDSC(amountToMint);
 
-        
         uint256 expectedHealthFactor = dscEngine.calculateHealthFactor(
             amountToMint + MINT_AMOUNT, dscEngine.getUsdValue(weth, (AMOUNT_COLLATERAL - amountCollateralToRedeem))
         );
@@ -345,7 +344,6 @@ contract DSCEngineTest is Test {
     //                           LIQUIDATE
     //////////////////////////////////////////////////////////////*/
 
-
     // modifier idea will be to change the pricefeed data after initializing the debtor so for example
     // eth -> 1000 usd to eth -> 100 usd then we can liquidate
     // modifier liquidatorSetup() {
@@ -353,7 +351,7 @@ contract DSCEngineTest is Test {
     //     // Account Starting_ERC20_balance Collateral DSC_MINTED
     //     // DEBTOR  10  10 1
     //     // LIQUDATOR 100 50 5
-    //     // price 2000 
+    //     // price 2000
 
     //     ERC20Mock(weth).mint(DEBTOR, DEBTOR_STARTING_ERC20_BALANCE);
     //     ERC20Mock(weth).mint(LIQUIDATOR, LIQUIDATOR_STARTING_ERC20_BALANCE);
@@ -394,7 +392,7 @@ contract DSCEngineTest is Test {
 
     // }
 
-/* 
+    /* 
     function testLiquidateSucceedsAndImprovesHealthFactor() public liquidatorSetup {
         vm.prank(DEBTOR);
         dscEngine.mintDSC(DEBTOR_MINT_AMOUNT * 5);

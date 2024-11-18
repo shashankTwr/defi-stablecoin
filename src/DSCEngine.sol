@@ -27,6 +27,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {console} from "forge-std/Test.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 /// @title DSCEngine
 /// @author Shashank Tiwari
@@ -55,6 +56,11 @@ contract DSCEngine is ReentrancyGuard {
     error DSCENGINE__HealthFactorNotImproved();
     error DSCEngine__NotEnoughDSCToBurn();
     error DSCEngine__NotEnoughCollateral();
+
+    /*//////////////////////////////////////////////////////////////
+    //                              TYPE                         //
+    //////////////////////////////////////////////////////////////*/
+    using OracleLib for AggregatorV3Interface;
 
     /*//////////////////////////////////////////////////////////////
     //                        STATE VARIABLES                     //
@@ -345,7 +351,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function _getUsdValue(address token, uint256 amount) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         // 1 ETH  = $1000
         // the returned value from the price feed is in 1e8
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
@@ -404,7 +410,7 @@ contract DSCEngine is ReentrancyGuard {
         // $/ETH ETH??
         // $2000 /ETH , $1000 = 0.5 ETH
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         return ((usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
     }
 
@@ -448,7 +454,6 @@ contract DSCEngine is ReentrancyGuard {
         return _healthFactor(user);
     }
 
-
     // function _getTotalDSCMinted() internal view returns(uint256) {
     //     uint256 totalDscMinted = 0;
     //     for(uint256 i = 0; i < s_DSCMinted.length; i++) {
@@ -466,4 +471,11 @@ contract DSCEngine is ReentrancyGuard {
     //         return _getUsdValue(token, amountDeposited);
     //     }
     // }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        if (token == address(0)) {
+            revert DSCEngine__NotAllowedToken();
+        }
+        return s_priceFeeds[token];
+    }
 }

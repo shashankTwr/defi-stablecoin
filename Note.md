@@ -29,6 +29,8 @@
 27:24:44 andler-Based Fuzz(Invariant) tests Debugging Fuzz Tests
 27:26:41 Handler-Based Fuzz Test Why mintDSC not called
 27:33:13 Price Feed Handling
+27:41:12 OracleLib and Oracle Proper Use
+27:49:41 Note on Audit Preparedness
 
 ## DefiLlama
 
@@ -112,3 +114,8 @@
 ```
 forge inspect DSCEngine methods
 ```
+
+
+## Audit readiness
+
+1. nascent.xyz audit checklist

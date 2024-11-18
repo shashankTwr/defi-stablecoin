@@ -5,7 +5,6 @@
 // // 1. Total supply of DSC shopuld be less then than the total value of collateral
 // // 2. Getter view functions should never revert <- evergreen invariant (always)
 
-
 // pragma solidity ^0.8.19;
 
 // import {Test, console} from "forge-std/Test.sol";
@@ -26,7 +25,6 @@
 //     HelperConfig config;
 //     address weth;
 //     address wbtc;
-
 
 //     function setUp() external {
 //         deployer = new DeployDSC();
