@@ -23,6 +23,12 @@
    26:11:05 - Deposit Collateral tests
 26:27:29 Fuzz(Invariant) Testing video
 26:37:01 Open-Based Fuzz(Invariant) Tests
+26:56:40 Handler-Based Fuzz(Invariant) tests Setting revert_on_fail = true deposit Collateral
+27:13:42 Handler-Based Fuzz(Invariant) tests Redeeming collateral
+27:19:27 Handler-Based Fuzz(Invariant) tests Minting DSC
+27:24:44 andler-Based Fuzz(Invariant) tests Debugging Fuzz Tests
+27:26:41 Handler-Based Fuzz Test Why mintDSC not called
+27:33:13 Price Feed Handling
 
 ## DefiLlama
 
@@ -100,3 +106,9 @@
 3. Handler based testing is important for invariant testing 
    1. functions check the order of functions execution
    2. ![alt text](image.png)
+
+## command
+
+```
+forge inspect DSCEngine methods
+```

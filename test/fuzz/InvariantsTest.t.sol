@@ -1,4 +1,4 @@
-SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // have our invariants
 
 // WHat are out Invariants?
@@ -17,6 +17,7 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Handler} from "./Handler.t.sol";
 
 contract InvariantsTest  is  StdInvariant, Test {
 
@@ -24,6 +25,7 @@ contract InvariantsTest  is  StdInvariant, Test {
     DecentralizedStableCoin dsc;
     DSCEngine dscEngine;
     HelperConfig config;
+    Handler handler;
     address weth;
     address wbtc;
 
@@ -32,7 +34,9 @@ contract InvariantsTest  is  StdInvariant, Test {
         deployer = new DeployDSC();
         (dsc, dscEngine, config) = deployer.run();
         (,,weth,wbtc,) = config.activeNetworkConfig();
-        targetContract(address(dscEngine));
+        handler = new Handler(dscEngine, dsc);
+        targetContract(address(handler));
+        // handler that handles the order the way redeem collateral is called
     }
 
     function invariant_protocolMustHaveMoreValueThanTotalSupply() public view {
@@ -47,9 +51,18 @@ contract InvariantsTest  is  StdInvariant, Test {
         console.log("weth value:", wethValue);
         console.log("wbtc value:", wbtcValue);
         console.log("total supply:", totalSupply);
+        console.log("times mint is called", handler.timesMintIsCalled());
+        console.log("totalDscMinted", handler.totalDscMint());
+        console.log("collateralValueInUsd", handler.collateralValue());
 
-        assert(wethValue + wbtcValue >= totalSupply);
+        assert((wethValue + wbtcValue) >= totalSupply);
 
+    }
+
+    // layup invariant to include getter functions
+    function invariant_gettersShouldNotRevert() public view {
+        dsce.geLiquidationBonus();
+        dsce.getPrecision();
     }
 
 }
