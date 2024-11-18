@@ -79,7 +79,6 @@ contract Handler is Test {
         collateralValue -= amountCollateral;
     }
 
-    
     // Helper functions
 
     function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
@@ -92,7 +91,7 @@ contract Handler is Test {
 }
 
 // bug have to fix updation
-    // function updateCollateralPrice(uint96 newPrice) public {
-    //     int256 newPriceInt = int256(uint256(newPrice));
-    //     ethUsdPriceFeed.updateAnswer(newPriceInt);
-    // }
+// function updateCollateralPrice(uint96 newPrice) public {
+//     int256 newPriceInt = int256(uint256(newPrice));
+//     ethUsdPriceFeed.updateAnswer(newPriceInt);
+// }
